@@ -45,6 +45,10 @@ module.exports = {
 					}
 				]
 			},
+			{
+                test: /\.(glsl|vert|frag)$/,
+                use: 'raw-loader', // or 'glslify-loader'
+            },
 		],
 	},
 	plugins: [
