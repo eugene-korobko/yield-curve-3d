@@ -50,18 +50,33 @@ function curveDataToLinesBuffers(data: YieldCurveData): LinesBuffer[] {
 	return res;
 }
 
-export interface DrawBuffer {
-	glBuffer: WebGLBuffer;
+export interface Segment {
+	offset: number;
 	pointsCount: number;
 }
 
+export interface DrawBuffer {
+	glBuffer: WebGLBuffer;
+	segments: Segment[];
+}
+
 function createLineGLBuffers(gl: WebGL2RenderingContext, buffers: LinesBuffer[]): DrawBuffer[] {
-	return buffers.map((buffer: LinesBuffer) => {
-		const positionBuffer = gl.createBuffer();
-		gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
-		gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(buffer), gl.STATIC_DRAW);
-		return { glBuffer: positionBuffer, pointsCount: buffer.length / 3 };
-	});
+	const positionBuffer = gl.createBuffer();
+	gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+	const segments: Segment[] = [];
+	let totalBuffer: number[] = [];
+	for (const buffer of buffers) {
+		segments.push({
+			offset: totalBuffer.length / 3,
+			pointsCount: buffer.length / 3,
+		});
+		totalBuffer = totalBuffer.concat(buffer);
+	}
+	gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(totalBuffer), gl.STATIC_DRAW);
+	return [{
+		glBuffer: positionBuffer,
+		segments,
+	}];
 }
 
 export interface RenderingData {
@@ -69,32 +84,42 @@ export interface RenderingData {
 	surfacesBuffers: DrawBuffer[];
 }
 
-export function createSurfacesGLBuffers(gl: WebGL2RenderingContext, series1: LinesBuffer, series2: LinesBuffer): DrawBuffer {
-	const mergedLinesBuffer = [];
-	for (let i = 0; i < series1.length; i += 3) {
-		mergedLinesBuffer.push(series1[i], series1[i+1], series1[i+2]);
-		mergedLinesBuffer.push(series2[i], series2[i+1], series2[i+2]);
-	}
+export function createSurfacesGLBuffers(gl: WebGL2RenderingContext, serieses: LinesBuffer[]): DrawBuffer[] {
 	const positionBuffer = gl.createBuffer();
 	gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+	const segments: Segment[] = [];
+
+	let mergedLinesBuffer: number[] = [];
+	for (let j = 0; j < serieses.length - 1; j++) {
+		const series1 = serieses[j];
+		const series2 = serieses[j + 1];
+		const bandBuffer = [];
+		for (let i = 0; i < series1.length; i += 3) {
+			bandBuffer.push(series1[i], series1[i+1], series1[i+2]);
+			bandBuffer.push(series2[i], series2[i+1], series2[i+2]);
+		}
+		segments.push({
+			offset: mergedLinesBuffer.length / 3,
+			pointsCount: bandBuffer.length / 3,
+		});
+		mergedLinesBuffer = mergedLinesBuffer.concat(bandBuffer);
+	}
 	gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(mergedLinesBuffer), gl.STATIC_DRAW);
-	return { glBuffer: positionBuffer, pointsCount: mergedLinesBuffer.length / 3 };	
+	return [{
+		glBuffer: positionBuffer,
+		segments,
+	}];
 }
 
 export function prepareBuffers(gl: WebGL2RenderingContext, data: YieldCurveData): RenderingData {
 	const preparedLines = yieldDataToLineBuffers(data);
 	const linesBuffers = createLineGLBuffers(gl, preparedLines);
-	const surfacesBuffers: DrawBuffer[] = [];
-	for (let i = 0; i < preparedLines.length - 1; i++) {
-		surfacesBuffers.push(createSurfacesGLBuffers(gl, preparedLines[i], preparedLines[i+1]));
-	}
+	const surfacesBuffers: DrawBuffer[] = createSurfacesGLBuffers(gl, preparedLines);
 	return {
 		linesBuffers,
 		surfacesBuffers,
 	};
-
 }
-
 
 export function removeGLBuffers(gl: WebGL2RenderingContext, buffers: RenderingData): void {
 	buffers.linesBuffers.concat(buffers.surfacesBuffers).forEach((buffer: DrawBuffer) => {

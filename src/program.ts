@@ -4,7 +4,7 @@ import * as linesFragmentShaderSrc from './shaders/lines-fragment-shader.glsl';
 import * as surfaceVertexShaderSrc from './shaders/surface-vertex-shader.glsl';
 import * as surfaceFragmentShaderSrc from './shaders/surface-fragment-shader.glsl';
 import { Camera } from './camera';
-import { DrawBuffer, PriceRange, RenderingData } from './data';
+import { DrawBuffer, PriceRange, RenderingData, Segment } from './data';
 import { vec4 } from 'gl-matrix';
 
 export interface UniformLocationsBase {
@@ -19,7 +19,6 @@ export interface ProgramBase {
 	fragmentShader: WebGLShader;
 	uniformLocations: UniformLocationsBase;
 	positionAttributeLocation: number;
-	vao: WebGLVertexArrayObject;
 }
 
 export interface LinesProgramUniformLocations extends UniformLocationsBase {
@@ -114,7 +113,7 @@ function createLinesProgram(gl: WebGL2RenderingContext): LinesProgram {
 			...getBaseLocations(gl, linesProgram),
 			colorLocation: gl.getUniformLocation(linesProgram, 'u_color')!,
 		},
-		...createVao(gl, linesProgram),
+		positionAttributeLocation: gl.getAttribLocation(linesProgram, 'a_position'),
 	}
 }
 
@@ -133,7 +132,7 @@ function createSurfaceProgram(gl: WebGL2RenderingContext): SurfaceProgram {
 			priceMax: gl.getUniformLocation(surfaceProgram, 'u_priceMax')!,
 			priceMin: gl.getUniformLocation(surfaceProgram, 'u_priceMin')!,
 		},
-		...createVao(gl, surfaceProgram),
+		positionAttributeLocation: gl.getAttribLocation(surfaceProgram, 'a_position'),
 	};
 }
 
@@ -189,7 +188,9 @@ export function draw(
 			gl.vertexAttribPointer(programs.surfaceProgram.positionAttributeLocation, size, type, normalize, stride, offset);
 		}
 
-		gl.drawArrays(gl.TRIANGLE_STRIP, 0, buffer.pointsCount);
+		buffer.segments.forEach((segment: Segment) => {
+			gl.drawArrays(gl.TRIANGLE_STRIP, segment.offset, segment.pointsCount);
+		});
 	});
 
 	// draw lines
@@ -212,7 +213,9 @@ export function draw(
 			gl.vertexAttribPointer(programs.linesProgram.positionAttributeLocation, size, type, normalize, stride, offset);
 		}
 
-		gl.drawArrays(gl.LINE_STRIP, 0, buffer.pointsCount);
+		buffer.segments.forEach((segment: Segment) => {
+			gl.drawArrays(gl.LINE_STRIP, segment.offset, segment.pointsCount);
+		});
 	});
 
 }
