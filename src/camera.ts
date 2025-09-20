@@ -1,8 +1,12 @@
 import { glMatrix, mat4, vec3, vec4 } from 'gl-matrix';
 
 export class Camera {
+	private _rotateY: mat4;
+	private _rotateX: mat4;
+	private _scale: mat4;
+	private _translate: mat4;
 	private _modelMatrix: mat4;
-	private _viewMatrix: mat4;
+	private _viewMatrix!: mat4;
 	private _projectionMatrix: mat4;
 
 	public constructor(
@@ -14,23 +18,31 @@ export class Camera {
 		priceRangeLength: number
 	) {
 		this._modelMatrix = mat4.create();
-		mat4.scale(this._modelMatrix, this._modelMatrix, vec3.fromValues(1, 1, 0.5 * timePointsCount / seriesCount));
 
-		this._viewMatrix = mat4.create();
+		this._rotateX = mat4.rotateX(mat4.create(), mat4.create(), Math.PI / 8);
+		this._rotateY = mat4.rotateY(mat4.create(), mat4.create(), Math.PI / 4);
 
-		mat4.scale(this._viewMatrix, this._viewMatrix, vec3.fromValues(
-			0.5 * width / timePointsCount,
-			-0.3 * height / priceRangeLength,
-			1)
+		this._scale = mat4.scale(
+			mat4.create(),
+			mat4.create(),
+			vec3.fromValues(
+				width / timePointsCount,
+				-0.3 * height / priceRangeLength,
+				5 * timePointsCount / seriesCount
+			)
 		);
-		mat4.translate(this._viewMatrix, this._viewMatrix, vec3.fromValues(
-			-timePointsCount * 0.5,
-			-minPrice - priceRangeLength * 0.3,
-			5)
+
+		this._translate = mat4.translate(
+			mat4.create(),
+			mat4.create(),
+			vec3.fromValues(
+				-timePointsCount * 0.5,
+				-minPrice - priceRangeLength * 0.3,
+				-0.5 * seriesCount
+			)
 		);
 
-		mat4.rotateX(this._viewMatrix, this._viewMatrix, -Math.PI / 8);
-		mat4.rotateY(this._viewMatrix, this._viewMatrix, Math.PI / 4);
+		this._updateViewMatrix();
 
 		this._projectionMatrix = mat4.create();
 
@@ -55,5 +67,23 @@ export class Camera {
 
 	public projectionMatrix(): mat4 {
 		return this._projectionMatrix;
+	}
+
+	public rotateX(angle: number): void {
+		this._rotateX = mat4.rotateX(this._rotateX, this._rotateX, angle);
+		this._updateViewMatrix();
+	}
+
+	public rotateY(angle: number): void {
+		this._rotateY = mat4.rotateY(this._rotateY, this._rotateY, angle);
+		this._updateViewMatrix();
+	}
+
+	private _updateViewMatrix(): void {
+		this._viewMatrix = mat4.create();
+		this._viewMatrix = mat4.multiply(this._viewMatrix, this._viewMatrix, this._rotateX);
+		this._viewMatrix = mat4.multiply(this._viewMatrix, this._viewMatrix, this._rotateY);
+		this._viewMatrix = mat4.multiply(this._viewMatrix, this._viewMatrix, this._scale);
+		this._viewMatrix = mat4.multiply(this._viewMatrix, this._viewMatrix, this._translate);
 	}
 }

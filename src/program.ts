@@ -167,8 +167,8 @@ export function draw(
 
 	// draw surface
 	gl.useProgram(programs.surfaceProgram.program);
-	gl.uniform4f(programs.surfaceProgram.uniformLocations.colorUp, 0.2, 0.2, 1, 1);
-	gl.uniform4f(programs.surfaceProgram.uniformLocations.colorDown, 0.2, 0.2, 0.5, 1);
+	gl.uniform4f(programs.surfaceProgram.uniformLocations.colorUp, 0.7, 0.7, 1, 1);
+	gl.uniform4f(programs.surfaceProgram.uniformLocations.colorDown, 0.1, 0.1, 0.3, 1);
 	gl.uniform1f(programs.surfaceProgram.uniformLocations.priceMin, priceRange[0]);
 	gl.uniform1f(programs.surfaceProgram.uniformLocations.priceMax, priceRange[1]);
 
@@ -196,7 +196,7 @@ export function draw(
 	// draw lines
 	
 	gl.useProgram(programs.linesProgram.program);
-	gl.uniform4f(programs.linesProgram.uniformLocations.colorLocation, 0, 0, 0, 1);
+	gl.uniform4f(programs.linesProgram.uniformLocations.colorLocation, 1, 1, 0.6, 1);
 	applyCameraToUniforms(gl, programs.linesProgram.uniformLocations, camera);
 	data.linesBuffers.forEach((buffer: DrawBuffer) => {
 		gl.bindBuffer(gl.ARRAY_BUFFER, buffer.glBuffer);
