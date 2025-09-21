@@ -153,10 +153,53 @@ export function applyCameraToUniforms(gl: WebGL2RenderingContext, uniforms: Unif
 	gl.uniformMatrix4fv(uniforms.projectionMatrixLocation, false, camera.projectionMatrix());
 }
 
+export interface Vaos {
+	surfacesVaos: WebGLVertexArrayObject[];
+	linesVaos: WebGLVertexArrayObject[];
+}
+
+export function prepareVaos(
+	gl: WebGL2RenderingContext,
+	programs: Programs,
+	data: RenderingData,
+): Vaos {
+	const size = 3;          // 3 components per iteration
+	const type = gl.FLOAT;   // the data is 32bit floats
+	const normalize = false; // don't normalize the data
+	const stride = 0;        // 0 = move forward size * sizeof(type) each iteration to get the next position
+	const offset = 0;        // start at the beginning of the buffer
+	return {
+		surfacesVaos: data.surfacesBuffers.map((value: DrawBuffer) => {
+			gl.bindBuffer(gl.ARRAY_BUFFER, value.glBuffer);
+			const vao = gl.createVertexArray();
+			gl.bindVertexArray(vao);
+			gl.enableVertexAttribArray(programs.surfaceProgram.positionAttributeLocation);
+			return vao;
+		}),
+		linesVaos: data.linesBuffers.map((value: DrawBuffer) => {
+			gl.bindBuffer(gl.ARRAY_BUFFER, value.glBuffer);
+			const vao = gl.createVertexArray();
+			gl.bindVertexArray(vao);
+			gl.enableVertexAttribArray(programs.surfaceProgram.positionAttributeLocation);
+			return vao;
+		}),
+	};
+}
+
+function vertexAttribPointer(gl: WebGL2RenderingContext, positionAttributeLocation: number): void {
+	const size = 3;          // 3 components per iteration
+	const type = gl.FLOAT;   // the data is 32bit floats
+	const normalize = false; // don't normalize the data
+	const stride = 0;        // 0 = move forward size * sizeof(type) each iteration to get the next position
+	const offset = 0;        // start at the beginning of the buffer
+	gl.vertexAttribPointer(positionAttributeLocation, size, type, normalize, stride, offset);
+}
+
 export function draw(
 	gl: WebGL2RenderingContext,
 	programs: Programs,
 	data: RenderingData,
+	vaos: Vaos,
 	camera: Camera,
 	priceRange: PriceRange,
 ): void {
@@ -173,24 +216,16 @@ export function draw(
 	gl.uniform1f(programs.surfaceProgram.uniformLocations.priceMax, priceRange[1]);
 
 	applyCameraToUniforms(gl, programs.surfaceProgram.uniformLocations, camera);
-	data.surfacesBuffers.forEach((buffer: DrawBuffer) => {
+	data.surfacesBuffers.forEach((buffer: DrawBuffer, index: number) => {
 		gl.bindBuffer(gl.ARRAY_BUFFER, buffer.glBuffer);
-		const vao = gl.createVertexArray();
+		const vao = vaos.surfacesVaos[index];
 		gl.bindVertexArray(vao);
-		gl.enableVertexAttribArray(programs.surfaceProgram.positionAttributeLocation);
-
-		{
-			const size = 3;          // 3 components per iteration
-			const type = gl.FLOAT;   // the data is 32bit floats
-			const normalize = false; // don't normalize the data
-			const stride = 0;        // 0 = move forward size * sizeof(type) each iteration to get the next position
-			const offset = 0;        // start at the beginning of the buffer
-			gl.vertexAttribPointer(programs.surfaceProgram.positionAttributeLocation, size, type, normalize, stride, offset);
-		}
-
+		vertexAttribPointer(gl, programs.surfaceProgram.positionAttributeLocation);
 		buffer.segments.forEach((segment: Segment) => {
 			gl.drawArrays(gl.TRIANGLE_STRIP, segment.offset, segment.pointsCount);
 		});
+
+		gl.deleteVertexArray(vao);
 	});
 
 	// draw lines
@@ -198,24 +233,30 @@ export function draw(
 	gl.useProgram(programs.linesProgram.program);
 	gl.uniform4f(programs.linesProgram.uniformLocations.colorLocation, 1, 1, 0.6, 1);
 	applyCameraToUniforms(gl, programs.linesProgram.uniformLocations, camera);
-	data.linesBuffers.forEach((buffer: DrawBuffer) => {
+	data.linesBuffers.forEach((buffer: DrawBuffer, index: number) => {
 		gl.bindBuffer(gl.ARRAY_BUFFER, buffer.glBuffer);
-		const vao = gl.createVertexArray();
+		const vao = vaos.linesVaos[index];
 		gl.bindVertexArray(vao);
-		gl.enableVertexAttribArray(programs.linesProgram.positionAttributeLocation);
-
-		{
-			const size = 3;          // 3 components per iteration
-			const type = gl.FLOAT;   // the data is 32bit floats
-			const normalize = false; // don't normalize the data
-			const stride = 0;        // 0 = move forward size * sizeof(type) each iteration to get the next position
-			const offset = 0;        // start at the beginning of the buffer
-			gl.vertexAttribPointer(programs.linesProgram.positionAttributeLocation, size, type, normalize, stride, offset);
-		}
+		vertexAttribPointer(gl, programs.linesProgram.positionAttributeLocation);
 
 		buffer.segments.forEach((segment: Segment) => {
 			gl.drawArrays(gl.LINE_STRIP, segment.offset, segment.pointsCount);
 		});
 	});
+}
 
+export function removePrograms(
+	gl: WebGL2RenderingContext,
+	programs: Programs,
+): void {
+	gl.deleteProgram(programs.linesProgram);
+	gl.deleteProgram(programs.surfaceProgram);
+}
+
+export function removeVaos(
+	gl: WebGL2RenderingContext,
+	vaos: Vaos
+): void {
+	vaos.linesVaos.forEach(gl.deleteVertexArray.bind(gl));
+	vaos.surfacesVaos.forEach(gl.deleteVertexArray.bind(gl));
 }

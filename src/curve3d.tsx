@@ -12,7 +12,7 @@ import {
 	PriceRange,
 } from './data';
 
-import { Programs, draw, prepareProgram } from './program';
+import { Programs, draw, prepareProgram, prepareVaos, removeProgram, removeVaos } from './program';
 import { Camera } from './camera';
 
 import * as s from './curve3d.css';
@@ -67,6 +67,7 @@ export function Curve3D() {
 
 			const data = testYieldData();
 			const glBuffers = prepareBuffers(gl, data);
+			const vaos = prepareVaos(gl, programs, glBuffers);
 
 			const priceRange = datePriceRange(data);
 			const priceRangeLength = priceRange[1] - priceRange[0];
@@ -82,9 +83,19 @@ export function Curve3D() {
 				priceRangeLength
 			);
 
-			paint.current = draw.bind(null, gl, programs, glBuffers, camera.current, priceRange);
+			paint.current = draw.bind(
+				null,
+				gl,
+				programs,
+				glBuffers,
+				vaos,
+				camera.current,
+				priceRange
+			);
 			paint.current();
 			return () => {
+				removeProgram(gl, programs);
+				removeVaos(gl, vaos);
 				removeGLBuffers(gl, glBuffers);
 			};
 		},
