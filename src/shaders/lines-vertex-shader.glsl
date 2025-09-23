@@ -15,4 +15,7 @@ void main() {
 
 	// 3. Transform vertex from camera space to clip space (for projection)
 	gl_Position = u_projectionMatrix * viewPosition;
+
+	// try to fix z-fighting
+	gl_Position[2] = gl_Position[2] - 0.00005;
 }
