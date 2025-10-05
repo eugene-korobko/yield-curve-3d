@@ -76,20 +76,6 @@ function createProgram(gl: WebGL2RenderingContext, vertexShader: WebGLShader, fr
 	throw error;
 }
 
-function createVao(gl: WebGL2RenderingContext, program: WebGLProgram): { vao: WebGLVertexArrayObject; positionAttributeLocation: number } {
-	const positionAttributeLocation = gl.getAttribLocation(program, 'a_position');
-	const vao = gl.createVertexArray();
-	gl.bindVertexArray(vao);
-	gl.enableVertexAttribArray(positionAttributeLocation);
-	const size = 3;          // 3 components per iteration
-	const type = gl.FLOAT;   // the data is 32bit floats
-	const normalize = false; // don't normalize the data
-	const stride = 0;        // 0 = move forward size * sizeof(type) each iteration to get the next position
-	const offset = 0;        // start at the beginning of the buffer
-	gl.vertexAttribPointer(positionAttributeLocation, size, type, normalize, stride, offset);
-	return { vao, positionAttributeLocation };
-}
-
 function getBaseLocations(gl: WebGL2RenderingContext, program: WebGLProgram): UniformLocationsBase {
 	const modelMatrixLocation = gl.getUniformLocation(program, 'u_modelMatrix')!;
 	const viewMatrixLocation = gl.getUniformLocation(program, 'u_viewMatrix')!;
@@ -143,10 +129,6 @@ export function prepareProgram(gl: WebGL2RenderingContext): Programs {
 	};
 }
 
-export function removeProgram(gl: WebGL2RenderingContext, programs: Programs): void {
-
-}
-
 export function applyCameraToUniforms(gl: WebGL2RenderingContext, uniforms: UniformLocationsBase, camera: Camera) {
 	gl.uniformMatrix4fv(uniforms.modelMatrixLocation, false, camera.modelMatrix());
 	gl.uniformMatrix4fv(uniforms.viewMatrixLocation, false, camera.viewMatrix());
@@ -163,11 +145,6 @@ export function prepareVaos(
 	programs: Programs,
 	data: RenderingData,
 ): Vaos {
-	const size = 3;          // 3 components per iteration
-	const type = gl.FLOAT;   // the data is 32bit floats
-	const normalize = false; // don't normalize the data
-	const stride = 0;        // 0 = move forward size * sizeof(type) each iteration to get the next position
-	const offset = 0;        // start at the beginning of the buffer
 	return {
 		surfacesVaos: data.surfacesBuffers.map((value: DrawBuffer) => {
 			gl.bindBuffer(gl.ARRAY_BUFFER, value.glBuffer);
@@ -249,8 +226,8 @@ export function removePrograms(
 	gl: WebGL2RenderingContext,
 	programs: Programs,
 ): void {
-	gl.deleteProgram(programs.linesProgram);
-	gl.deleteProgram(programs.surfaceProgram);
+	gl.deleteProgram(programs.linesProgram.program);
+	gl.deleteProgram(programs.surfaceProgram.program);
 }
 
 export function removeVaos(
