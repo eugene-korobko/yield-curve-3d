@@ -17,7 +17,7 @@ export class Camera {
 		minPrice: number,
 		priceRangeLength: number
 	) {
-		this._modelMatrix = mat4.create();
+		this._modelMatrix = mat4.scale(mat4.create(), mat4.create(), vec3.fromValues(1, 1, 1));
 
 		this._rotateX = mat4.rotateX(mat4.create(), mat4.create(), Math.PI / 8);
 		this._rotateY = mat4.rotateY(mat4.create(), mat4.create(), Math.PI / 4);
@@ -27,7 +27,7 @@ export class Camera {
 			mat4.create(),
 			vec3.fromValues(
 				width / timePointsCount,
-				-0.3 * height / priceRangeLength,
+				0.3 * height / priceRangeLength,
 				5 * timePointsCount / seriesCount
 			)
 		);

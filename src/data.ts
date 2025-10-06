@@ -82,6 +82,7 @@ function createLineGLBuffers(gl: WebGL2RenderingContext, buffers: LinesBuffer[])
 export interface RenderingData {
 	linesBuffers: DrawBuffer[];
 	surfacesBuffers: DrawBuffer[];
+	axisBuffer: DrawBuffer;
 }
 
 export function createSurfacesGLBuffers(gl: WebGL2RenderingContext, serieses: LinesBuffer[]): DrawBuffer[] {
@@ -111,6 +112,24 @@ export function createSurfacesGLBuffers(gl: WebGL2RenderingContext, serieses: Li
 	}];
 }
 
+export function createAxisBuffer(gl: WebGL2RenderingContext): DrawBuffer {
+	const positionBuffer = gl.createBuffer();
+	gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+	const data: number[] = [
+		0, 0, 0, 10000, 0, 0,	// X axis
+		0, 0, 0, 0, 10000, 0,	// Y axis
+		0, 0, 0, 0, 0, 10000	// Z axis
+	];
+	gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(data), gl.STATIC_DRAW);
+	return {
+		glBuffer: positionBuffer,
+		segments: [{
+			offset: 0,
+			pointsCount: 6,
+		}],
+	};
+}
+
 export function prepareBuffers(gl: WebGL2RenderingContext, data: YieldCurveData): RenderingData {
 	const preparedLines = yieldDataToLineBuffers(data);
 	const linesBuffers = createLineGLBuffers(gl, preparedLines);
@@ -118,6 +137,7 @@ export function prepareBuffers(gl: WebGL2RenderingContext, data: YieldCurveData)
 	return {
 		linesBuffers,
 		surfacesBuffers,
+		axisBuffer: createAxisBuffer(gl),
 	};
 }
 

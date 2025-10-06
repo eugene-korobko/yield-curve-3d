@@ -5,7 +5,7 @@ import * as surfaceVertexShaderSrc from './shaders/surface-vertex-shader.glsl';
 import * as surfaceFragmentShaderSrc from './shaders/surface-fragment-shader.glsl';
 import { Camera } from './camera';
 import { DrawBuffer, PriceRange, RenderingData, Segment } from './data';
-import { vec4 } from 'gl-matrix';
+import { mat4, vec3, vec4 } from 'gl-matrix';
 
 export interface UniformLocationsBase {
 	modelMatrixLocation: WebGLUniformLocation;
@@ -129,8 +129,13 @@ export function prepareProgram(gl: WebGL2RenderingContext): Programs {
 	};
 }
 
-export function applyCameraToUniforms(gl: WebGL2RenderingContext, uniforms: UniformLocationsBase, camera: Camera) {
-	gl.uniformMatrix4fv(uniforms.modelMatrixLocation, false, camera.modelMatrix());
+export function applyCameraToUniforms(
+	gl: WebGL2RenderingContext,
+	uniforms: UniformLocationsBase,
+	camera: Camera,
+	addiitionalModelTransform: mat4 = mat4.create(),
+ ): void {
+	gl.uniformMatrix4fv(uniforms.modelMatrixLocation, false, mat4.multiply(mat4.create(), addiitionalModelTransform, camera.modelMatrix()));
 	gl.uniformMatrix4fv(uniforms.viewMatrixLocation, false, camera.viewMatrix());
 	gl.uniformMatrix4fv(uniforms.projectionMatrixLocation, false, camera.projectionMatrix());
 }
@@ -138,6 +143,7 @@ export function applyCameraToUniforms(gl: WebGL2RenderingContext, uniforms: Unif
 export interface Vaos {
 	surfacesVaos: WebGLVertexArrayObject[];
 	linesVaos: WebGLVertexArrayObject[];
+	axisVao: WebGLVertexArrayObject;
 }
 
 export function prepareVaos(
@@ -145,6 +151,13 @@ export function prepareVaos(
 	programs: Programs,
 	data: RenderingData,
 ): Vaos {
+	function createAxisVao(): WebGLVertexArrayObject {
+		gl.bindBuffer(gl.ARRAY_BUFFER, data.axisBuffer.glBuffer);
+		const vao = gl.createVertexArray();
+		gl.bindVertexArray(vao);
+		gl.enableVertexAttribArray(programs.linesProgram.positionAttributeLocation);
+		return vao;
+	}
 	return {
 		surfacesVaos: data.surfacesBuffers.map((value: DrawBuffer) => {
 			gl.bindBuffer(gl.ARRAY_BUFFER, value.glBuffer);
@@ -160,6 +173,7 @@ export function prepareVaos(
 			gl.enableVertexAttribArray(programs.surfaceProgram.positionAttributeLocation);
 			return vao;
 		}),
+		axisVao: createAxisVao(),
 	};
 }
 
@@ -201,8 +215,6 @@ export function draw(
 		buffer.segments.forEach((segment: Segment) => {
 			gl.drawArrays(gl.TRIANGLE_STRIP, segment.offset, segment.pointsCount);
 		});
-
-		gl.deleteVertexArray(vao);
 	});
 
 	// draw lines
@@ -219,6 +231,24 @@ export function draw(
 		buffer.segments.forEach((segment: Segment) => {
 			gl.drawArrays(gl.LINE_STRIP, segment.offset, segment.pointsCount);
 		});
+	});
+
+	// draw axises
+	// use the same progeam as for lines
+	gl.uniform4f(programs.linesProgram.uniformLocations.colorLocation, 0.1, 0.1, 0.6, 1);
+	applyCameraToUniforms(
+		gl,
+		programs.linesProgram.uniformLocations,
+		camera,
+		mat4.translate(mat4.create(), mat4.create(), vec3.fromValues(0, priceRange[0], 0))
+	);
+	gl.bindBuffer(gl.ARRAY_BUFFER, data.axisBuffer.glBuffer);
+	const vao = vaos.axisVao;
+	gl.bindVertexArray(vao);
+	vertexAttribPointer(gl, programs.linesProgram.positionAttributeLocation);
+
+	data.axisBuffer.segments.forEach((segment: Segment) => {
+		gl.drawArrays(gl.LINES, segment.offset, segment.pointsCount);
 	});
 }
 
