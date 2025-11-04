@@ -3,6 +3,10 @@ import * as linesFragmentShaderSrc from './shaders/lines-fragment-shader.glsl';
 
 import * as surfaceVertexShaderSrc from './shaders/surface-vertex-shader.glsl';
 import * as surfaceFragmentShaderSrc from './shaders/surface-fragment-shader.glsl';
+
+import * as labelsVertexShaderSrc from './shaders/labels-vertex-shader.glsl';
+import * as labelsFragmentShaderSrc from './shaders/labels-fragment-shader.glsl';
+
 import { Camera } from './camera';
 import { DrawBuffer, PriceRange, RenderingData, Segment } from './data';
 import { mat4, vec3, vec4 } from 'gl-matrix';
@@ -29,7 +33,7 @@ export interface LinesProgram extends ProgramBase {
 	uniformLocations: LinesProgramUniformLocations;
 }
 
-export interface SurfaceProgramUniformLocation extends UniformLocationsBase {
+export interface SurfaceProgramUniformLocations extends UniformLocationsBase {
 	colorUp: WebGLUniformLocation;
 	colorDown: WebGLUniformLocation;
 	priceMin: WebGLUniformLocation;
@@ -37,12 +41,22 @@ export interface SurfaceProgramUniformLocation extends UniformLocationsBase {
 }
 
 export interface SurfaceProgram extends ProgramBase {
-	uniformLocations: SurfaceProgramUniformLocation;
+	uniformLocations: SurfaceProgramUniformLocations;
+}
+
+export interface LabelsProgramUniformLocations extends UniformLocationsBase {
+	color: WebGLUniformLocation;
+}
+
+export interface LabelsProgram extends ProgramBase {
+	uniformLocations: LabelsProgramUniformLocations;
+	pointIndexAttributeLocation: number;
 }
 
 export interface Programs {
 	linesProgram: LinesProgram;
 	surfaceProgram: SurfaceProgram;
+	labelsProgram: LabelsProgram;
 }
 
 function createShader(gl: WebGL2RenderingContext, type: GLenum, source: string): WebGLShader {
@@ -122,10 +136,28 @@ function createSurfaceProgram(gl: WebGL2RenderingContext): SurfaceProgram {
 	};
 }
 
+function createLabelsProgram(gl: WebGL2RenderingContext): LabelsProgram {
+	const labelsVertexShader = createShader(gl, gl.VERTEX_SHADER, labelsVertexShaderSrc.default);
+	const labelsFragmentShader = createShader(gl, gl.FRAGMENT_SHADER, labelsFragmentShaderSrc.default);
+	const labelsProgram = createProgram(gl, labelsVertexShader, labelsFragmentShader);
+	return {
+		program: labelsProgram,
+		vertexShader: labelsVertexShader,
+		fragmentShader: labelsFragmentShader,
+		uniformLocations: {
+			...getBaseLocations(gl, labelsProgram),
+			color: gl.getUniformLocation(labelsProgram, 'u_color')!,
+		},
+		positionAttributeLocation: gl.getAttribLocation(labelsProgram, 'a_position'),
+		pointIndexAttributeLocation: gl.getAttribLocation(labelsProgram, 'a_pointIndex'),
+	};
+}
+
 export function prepareProgram(gl: WebGL2RenderingContext): Programs {
 	return {
 		linesProgram: createLinesProgram(gl),
 		surfaceProgram: createSurfaceProgram(gl),
+		labelsProgram: createLabelsProgram(gl),
 	};
 }
 
@@ -144,6 +176,7 @@ export interface Vaos {
 	surfacesVaos: WebGLVertexArrayObject[];
 	linesVaos: WebGLVertexArrayObject[];
 	axisVao: WebGLVertexArrayObject;
+	labelsVao: WebGLVertexArrayObject;
 }
 
 export function prepareVaos(
@@ -156,6 +189,14 @@ export function prepareVaos(
 		const vao = gl.createVertexArray();
 		gl.bindVertexArray(vao);
 		gl.enableVertexAttribArray(programs.linesProgram.positionAttributeLocation);
+		return vao;
+	}
+	function createLabelsVao(): WebGLVertexArrayObject {
+		gl.bindBuffer(gl.ARRAY_BUFFER, data.labelsBuffer.glBuffer);
+		const vao = gl.createVertexArray();
+		gl.bindVertexArray(vao);
+		gl.enableVertexAttribArray(programs.labelsProgram.positionAttributeLocation);
+		gl.enableVertexAttribArray(programs.labelsProgram.pointIndexAttributeLocation);
 		return vao;
 	}
 	return {
@@ -174,16 +215,23 @@ export function prepareVaos(
 			return vao;
 		}),
 		axisVao: createAxisVao(),
+		labelsVao: createLabelsVao(),
 	};
 }
 
-function vertexAttribPointer(gl: WebGL2RenderingContext, positionAttributeLocation: number): void {
+function vertexAttribPointer(gl: WebGL2RenderingContext, positionAttributeLocation: number, stride: number = 0): number {
 	const size = 3;          // 3 components per iteration
 	const type = gl.FLOAT;   // the data is 32bit floats
 	const normalize = false; // don't normalize the data
-	const stride = 0;        // 0 = move forward size * sizeof(type) each iteration to get the next position
 	const offset = 0;        // start at the beginning of the buffer
 	gl.vertexAttribPointer(positionAttributeLocation, size, type, normalize, stride, offset);
+	return 12;
+}
+
+function vertexAttribIPointer(gl: WebGL2RenderingContext, positionAttributeLocation: number, offset: number, stride: number = 0): void {
+	const size = 1;          // 3 components per iteration
+	const type = gl.FLOAT;   // the data is 32bit floats
+	gl.vertexAttribPointer(positionAttributeLocation, size, type, false, stride, offset);
 }
 
 export function draw(
@@ -250,6 +298,27 @@ export function draw(
 	data.axisBuffer.segments.forEach((segment: Segment) => {
 		gl.drawArrays(gl.LINES, segment.offset, segment.pointsCount);
 	});
+
+	// draw labels
+	{
+		gl.useProgram(programs.labelsProgram.program);
+		gl.uniform4f(programs.labelsProgram.uniformLocations.color, 0.1, 0.1, 0.6, 1);
+		applyCameraToUniforms(
+			gl,
+			programs.labelsProgram.uniformLocations,
+			camera,
+			mat4.translate(mat4.create(), mat4.create(), vec3.fromValues(0, priceRange[0], 0))
+		);
+		gl.bindBuffer(gl.ARRAY_BUFFER, data.labelsBuffer.glBuffer);
+		const vao = vaos.labelsVao;
+		gl.bindVertexArray(vao);
+		const offset = vertexAttribPointer(gl, programs.labelsProgram.positionAttributeLocation, 16);
+		vertexAttribIPointer(gl, programs.labelsProgram.pointIndexAttributeLocation, offset, 16);
+
+		data.labelsBuffer.segments.forEach((segment: Segment) => {
+			gl.drawArrays(gl.TRIANGLE_STRIP, segment.offset, segment.pointsCount);
+		});
+	}
 }
 
 export function removePrograms(

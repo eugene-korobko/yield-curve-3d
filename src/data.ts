@@ -83,6 +83,8 @@ export interface RenderingData {
 	linesBuffers: DrawBuffer[];
 	surfacesBuffers: DrawBuffer[];
 	axisBuffer: DrawBuffer;
+	labelsBuffer: DrawBuffer;
+	canvas: HTMLCanvasElement;
 }
 
 export function createSurfacesGLBuffers(gl: WebGL2RenderingContext, serieses: LinesBuffer[]): DrawBuffer[] {
@@ -130,6 +132,42 @@ export function createAxisBuffer(gl: WebGL2RenderingContext): DrawBuffer {
 	};
 }
 
+function prepareCanvas(): HTMLCanvasElement {
+	const res = document.createElement('canvas');
+	res.width = 512;
+	res.height = 512;
+	const ctx = res.getContext('2d');
+	return res;
+}
+
+function prepareLabelsBuffer(gl: WebGL2RenderingContext, data: YieldCurveData): DrawBuffer {
+	const positionBuffer = gl.createBuffer();
+	gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+	const points: number[] = [];
+	const segments: Segment[] = [];
+	data.serieses.forEach((value: SeriesPlot, index: number) => {
+		segments.push({
+			offset: points.length / 4,
+			pointsCount: 4,
+		});
+		for (let pointIndex = 0; pointIndex < 4; pointIndex++) {
+			points.push(0, 0, index, pointIndex);
+		}
+		segments.push({
+			offset: points.length / 4,
+			pointsCount: 4,
+		});
+		for (let pointIndex = 0; pointIndex < 4; pointIndex++) {
+			points.push(value.points.length - 1, 0, index, pointIndex);
+		}
+	});
+	gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(points), gl.STATIC_DRAW);
+	return {
+		glBuffer: positionBuffer,
+		segments,
+	};
+}
+
 export function prepareBuffers(gl: WebGL2RenderingContext, data: YieldCurveData): RenderingData {
 	const preparedLines = yieldDataToLineBuffers(data);
 	const linesBuffers = createLineGLBuffers(gl, preparedLines);
@@ -138,6 +176,8 @@ export function prepareBuffers(gl: WebGL2RenderingContext, data: YieldCurveData)
 		linesBuffers,
 		surfacesBuffers,
 		axisBuffer: createAxisBuffer(gl),
+		canvas: prepareCanvas(),
+		labelsBuffer: prepareLabelsBuffer(gl, data),
 	};
 }
 
