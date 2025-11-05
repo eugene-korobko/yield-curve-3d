@@ -1,3 +1,4 @@
+import { vec4 } from 'gl-matrix';
 import * as CLF2026 from './test-data/CLF2026.csv';
 import * as CLG2026 from './test-data/CLG2026.csv';
 import * as CLH2026 from './test-data/CLH2026.csv';
@@ -53,6 +54,7 @@ function curveDataToLinesBuffers(data: YieldCurveData): LinesBuffer[] {
 export interface Segment {
 	offset: number;
 	pointsCount: number;
+	color?: vec4;
 }
 
 export interface DrawBuffer {
@@ -149,6 +151,7 @@ function prepareLabelsBuffer(gl: WebGL2RenderingContext, data: YieldCurveData): 
 		segments.push({
 			offset: points.length / 4,
 			pointsCount: 4,
+			color: vec4.fromValues(0.1, 0.1, 0.6, 1),
 		});
 		for (let pointIndex = 0; pointIndex < 4; pointIndex++) {
 			points.push(0, 0, index, pointIndex);
@@ -156,11 +159,31 @@ function prepareLabelsBuffer(gl: WebGL2RenderingContext, data: YieldCurveData): 
 		segments.push({
 			offset: points.length / 4,
 			pointsCount: 4,
+			color: vec4.fromValues(0.1, 0.1, 0.6, 1),
 		});
 		for (let pointIndex = 0; pointIndex < 4; pointIndex++) {
 			points.push(value.points.length - 1, 0, index, pointIndex);
 		}
 	});
+	data.timescale.forEach((value: TimePoint, index: number) => {
+		segments.push({
+			offset: points.length / 4,
+			pointsCount: 4,
+			color: vec4.fromValues(0.1, 0.6, 0.1, 1),
+		});
+		for (let pointIndex = 0; pointIndex < 4; pointIndex++) {
+			points.push(index, 0, 0, pointIndex);
+		}
+		segments.push({
+			offset: points.length / 4,
+			pointsCount: 4,
+			color: vec4.fromValues(0.1, 0.6, 0.1, 1),
+		});
+		for (let pointIndex = 0; pointIndex < 4; pointIndex++) {
+			points.push(index, 0, data.serieses.length - 1, pointIndex);
+		}
+	});
+
 	gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(points), gl.STATIC_DRAW);
 	return {
 		glBuffer: positionBuffer,

@@ -316,6 +316,9 @@ export function draw(
 		vertexAttribIPointer(gl, programs.labelsProgram.pointIndexAttributeLocation, offset, 16);
 
 		data.labelsBuffer.segments.forEach((segment: Segment) => {
+			if (segment.color) {
+				gl.uniform4fv(programs.labelsProgram.uniformLocations.color, segment.color);
+			}
 			gl.drawArrays(gl.TRIANGLE_STRIP, segment.offset, segment.pointsCount);
 		});
 	}
